@@ -1,0 +1,480 @@
+\documentclass[11pt]{article}
+
+% --- Packages ---
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\setstretch{1.03}
+\setlist[itemize]{leftmargin=*,itemsep=2pt,topsep=3pt}
+\setlist[enumerate]{leftmargin=*,itemsep=2pt,topsep=3pt}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,citecolor=black}
+\renewcommand{\arraystretch}{1.12}
+
+\title{\textbf{Less Left on the Shelf: Reducing Waste at Pasta \& Co. University Village}}
+\author{Elisa Regueros \and Chandler Olson}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This project investigates whether mathematical optimization can reduce bread waste at Pasta \& Co. University Village, where unsold bread is discarded daily. We compare the store's current ordering practices with two alternatives: optimized fixed daily quantities and optimized day-of-week quantities. Using a service-level-constrained newsvendor model, we aim to minimize expected waste while meeting estimated customer demand on at least 80\% of days. Historical waste records are used to estimate demand, and Monte Carlo simulation will be used to compare the strategies. Preliminary results suggest that the manager's current orders are already relatively effective, although adjusting Wednesday orders could reduce waste by approximately 5.1\% under our initial assumptions.
+\end{abstract}
+
+\section{Problem Description}
+
+Pasta \& Co., located in Seattle's University Village, receives daily bread deliveries from Grand Central Bakery. These deliveries include focaccia, Como bread, Rustic Baguettes, Demi Baguettes, and hoagie rolls. While leftover focaccia and hoagie rolls can be repurposed into croutons, unsold baguettes and Como bread are discarded at the end of each day. Consequently, ordering more bread than customers purchase results in unnecessary food waste and additional costs to the business.
+
+Currently, the store's manager places bread orders one week in advance, using fixed daily quantities determined primarily through experience. Although this strategy is relatively effective, historical waste records show that the amount of bread wasted differs throughout the week. For example, our preliminary analysis of the September 13--October 13, 2026 waste log found that Wednesdays averaged approximately 4.75 wasted units across the three products, while Saturdays averaged only 0.5 units. These differences suggest that adjusting inventory levels by weekday may reduce waste while maintaining sufficient stock.
+
+However, minimizing waste cannot be our only consideration. If the store simply ordered fewer units every day, it would likely waste less bread, but customers could also be unable to purchase the bread they wanted. Therefore, our model must account for both waste and customer demand.
+
+\noindent\textbf{Project Goal.} Develop and compare three bread-ordering strategies---current ordering practices, optimized fixed daily quantities, and optimized day-of-week quantities---to determine which minimizes expected food waste while meeting estimated customer demand on at least 80\% of days.
+
+Our final deliverable will be a recommended ordering schedule, supported by a comparison of expected waste and stockout frequency under each strategy. We will also consider whether the additional waste reduction from weekday-specific ordering is large enough to justify the extra time and effort required from the manager.
+
+\section{Simplifying Assumptions}
+
+To make this problem manageable, we make several simplifying assumptions.
+
+First, we restrict our analysis to Como bread, Rustic Baguettes, and Demi Baguettes. Focaccia and hoagie rolls are excluded because leftover quantities can be repurposed into croutons rather than discarded. This allows us to focus on the products for which excess inventory directly contributes to food waste.
+
+Second, we assume that demand for each bread type can be estimated using historical ordering and waste data. For the fixed optimization strategy, we use a single estimated demand distribution for each bread type, regardless of the weekday. For the day-of-week strategy, we estimate a separate distribution for each weekday. We assume that historical demand patterns are reasonably representative of future customer behavior. This does not account for changes due to holidays, weather, seasonal trends, or nearby events.
+
+Third, we model each bread type independently. This means that the quantity ordered for one bread type is determined without considering whether its availability or price influences demand for another type.
+
+Fourth, we assume that all bread delivered on a given day is available for sale that day and that unsold bread is discarded at closing. Inventory therefore does not carry over to the following day.
+
+Fifth, we assume that orders must consist of nonnegative whole numbers and that the supplier does not impose additional minimum-order quantities, batch restrictions, or capacity constraints. We also exclude delivery fees and other operating costs from our optimization.
+
+Finally, our most important assumption concerns \emph{censored demand}. On days when a product sells out, we know how many units were sold but not whether additional customers wanted to purchase it. For our initial model, we assume that demand equals observed sales, even when the product sells out. This gives us a lower-bound estimate of actual demand.
+
+We recognize that this assumption may underestimate demand and cause our model to recommend insufficient quantities. We will discuss this limitation and investigate how different assumptions about unmet demand affect our results.
+
+\section{Mathematical Model}
+
+Our project uses a variation of the newsvendor model, an optimization framework used to determine how much inventory to stock when future customer demand is uncertain \cite{choi2012,huber2019}.
+
+Traditional newsvendor models balance the cost of leftover inventory against the cost of missed sales. Since our primary goal is to reduce food waste rather than maximize profit, we use a \emph{service-level-constrained} version of the model. We aim to minimize expected leftover bread while ensuring that customer demand is met on at least 80\% of days under our estimated demand distributions.
+
+\subsection{Variables and Parameters}
+
+We define the following notation:
+
+\begin{center}
+\begin{tabular}{@{}>{$}l<{$}p{0.76\linewidth}@{}}
+\toprule
+\text{Symbol} & Definition \\
+\midrule
+b & Bread type (Rustic, Demi, or Como) \\
+d & Day of the week \\
+t & Historical observation date \\
+Q_{b,d} & Number of units of bread $b$ ordered on weekday $d$ \\
+D_{b,d} & Customer demand for bread $b$ on weekday $d$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Based on the October 18, 2026 invoice and the manager's confirmation that these quantities were used during our initial study period, we use the following current orders \cite{invoice2026}:
+
+\begin{table}[htbp]
+\centering
+\caption{Current daily bread orders and wholesale unit costs.}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Bread & Daily quantity & Wholesale unit cost \\
+\midrule
+Rustic Baguette & 3 & \$2.49 \\
+Demi Baguette & 8 & \$0.97 \\
+Como Loaf & 1 & \$3.45 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The manager explained that the store typically orders the same quantities daily, increasing them in winter and decreasing them in summer. We have confirmed the quantities during the initial study period. We plan to request substantially more historical daily order and waste records from the manager, ideally up to one year, to investigate weekday patterns and seasonal changes more reliably.
+
+\subsection{Objective Function}
+
+Our objective is to minimize the expected number of bread units wasted. For a given bread type and day, the expression $\max(Q_{b,d}-D_{b,d},0)$ directly measures leftovers. The maximum function ensures that waste cannot be negative. For example, if the store orders 8 Demi Baguettes and customer demand is 6, then 2 units are wasted. If demand is 10, the store wastes no bread, but 2 units of demand go unmet.
+
+Our objective function is
+\begin{equation}
+\boxed{\min_{\{Q_{b,d}\}}\;\sum_{d=1}^{7}\sum_{b=1}^{3}\mathbb{E}\!\left[\max\left(Q_{b,d}-D_{b,d},0\right)\right].}
+\label{eq:objective}
+\end{equation}
+Here, $\mathbb{E}$ represents expected value. Because customer demand varies, we calculate expected waste using the probabilities of different possible demand quantities.
+
+We estimate these probabilities using historical observations. For example, suppose demand for 1 Rustic Baguette occurs on 75\% of Wednesdays, while demand for 2 occurs on 25\%. If we order 2 baguettes, we would waste 1 baguette 75\% of the time and 0 baguettes 25\% of the time. Expected waste is therefore
+\begin{equation}
+\mathbb{E}[W]=(1)(0.75)+(0)(0.25)=0.75\text{ baguettes}.
+\end{equation}
+By repeating this calculation for different order quantities, we can compare their expected waste.
+
+Equation~\eqref{eq:objective} minimizes expected total waste over a typical week. We can divide the resulting weekly waste by 7 later, when reporting average daily waste; doing so does not affect the optimized order quantities.
+
+Our objective focuses on the \emph{number of bread units wasted} rather than their monetary value. We will also calculate the wholesale cost of discarded bread to illustrate the financial impact of each strategy, but cost will not determine the optimal quantities.
+
+\subsection{Constraints}
+
+\paragraph{Constraint 1: Customer Demand Satisfaction.}
+We require that the store have enough bread to satisfy customer demand on at least 80\% of days. For the weekday-specific strategy, we represent this as
+\begin{equation}
+\boxed{\Pr(D_{b,d}\le Q_{b,d})\ge 0.80\qquad\text{for every bread type }b\text{ and weekday }d.}
+\label{eq:service}
+\end{equation}
+This states that the probability of the amount ordered being greater than or equal to customer demand must be at least 80\%.
+
+For example, suppose we examine five Mondays and find that an order quantity of 7 Demi Baguettes would have met estimated demand on only three of them. Then
+\begin{equation}
+\Pr(D\le 7)=\frac{3}{5}=0.60.
+\end{equation}
+Since 60\% is below our 80\% requirement, ordering 7 baguettes would not satisfy the constraint. We must consider a larger quantity until the estimated probability reaches at least 80\%.
+
+This constraint is necessary because minimizing waste alone would lead the model to order zero bread. The 80\% requirement prevents the model from reducing orders so much that customer demand is frequently unmet.
+
+For the fixed strategy, we apply the 80\% requirement to the demand distribution across all weekdays combined. For the day-of-week strategy, we apply it separately to each weekday. We will report this distinction when comparing the strategies.
+
+\paragraph{Constraint 2: Whole-Number Quantities.}
+Bread must be ordered in whole units:
+\begin{equation}
+\boxed{Q_{b,d}\in\mathbb{Z}_{\ge 0}.}
+\label{eq:integer}
+\end{equation}
+
+\paragraph{Constraint 3: Ordering Schedule.}
+The manager must place orders one week in advance. Therefore, the quantities must be chosen before actual daily demand becomes known. Our model produces an ordering schedule that can be submitted ahead of time.
+
+\paragraph{Constraint 4: Shelf Life.}
+Bread must be discarded at the end of the day if it is not sold. We therefore assume that leftover inventory cannot be carried over to the following day.
+
+\subsection{Estimating Demand From the Waste Log}
+
+Although we have access to historical waste logs, they do not directly report customer demand. Because the manager confirmed the daily order quantities during the study period, we can estimate how many units were sold by subtracting the recorded leftovers from the number delivered:
+\begin{equation}
+\text{Estimated sales}=\text{Units delivered}-\text{Units discarded}.
+\label{eq:estimated-demand}
+\end{equation}
+We write $\widehat D_{b,t}$ for this estimated demand (observed sales) of bread $b$ on historical date $t$.
+
+For example, if the store ordered 3 Rustic Baguettes and discarded 2, we know that 1 was sold. Since bread remained, we assume demand was 1.
+
+However, on days when a product sells out, actual demand may be higher than the number of units sold. For example, if the store orders 8 baguettes and sells all 8, we cannot determine whether demand was exactly 8 or whether additional customers wanted one after inventory ran out. This is called \emph{censored demand}. On these days, we only know that
+\begin{equation}
+D_{b,t}^{\mathrm{actual}}\ge \widehat D_{b,t}.
+\end{equation}
+For our initial model, we use units sold as our estimate of demand, including on sold-out days. This represents the lowest demand consistent with the observed sales records.
+
+This assumption makes our initial model easier to solve, but it may underestimate actual demand and overestimate how frequently a proposed ordering strategy would satisfy customers. We will examine this limitation when interpreting our results and consider alternative assumptions about unmet demand in our later analysis.
+
+\subsection{Three Ordering Strategies}
+
+\paragraph{Strategy 1: Current Ordering.}
+The manager currently orders a fixed daily quantity for each bread type. Our baseline uses 3 Rustic Baguettes, 8 Demi Baguettes, and 1 Como Loaf per day. This strategy provides a comparison against the store's existing practices.
+
+\paragraph{Strategy 2: Fixed Optimization.}
+Determine one optimized quantity for each bread type that remains the same throughout the week. The model uses estimated demand observations from all weekdays combined to find the smallest quantity satisfying the 80\% requirement.
+
+\paragraph{Strategy 3: Day-of-Week Optimization.}
+Determine a separate optimal quantity for each bread type on each weekday. For example, the optimal quantity of Rustic Baguettes might be 3 on Monday but only 2 on Wednesday.
+
+The purpose of comparing Strategies 2 and 3 is to determine whether adjusting orders by weekday reduces waste enough to justify the additional time and effort required from the manager.
+
+\section{Solution of the Mathematical Problem}
+
+\subsection{Estimating Customer Demand}
+
+To solve our optimization problem, we first estimate the distribution of daily customer demand for each bread type using historical ordering quantities and waste records.
+
+For each day, we calculate estimated sales by subtracting the recorded waste from the number of units ordered. Under our simplifying assumption, we use these estimated sales as our demand observations.
+
+For our preliminary dataset, we treat dates without a recorded waste entry for one of the three products as having zero waste for that product. This assumption will need to be checked against the store's recordkeeping practices. We are also planning to obtain up to a year of historical records from the manager to improve the reliability of the estimated distributions.
+
+Once we have estimated demand for each historical day, we construct an \emph{empirical demand distribution}. This means we use the observed frequencies of different demand quantities to estimate their probabilities.
+
+For example, if our estimated demand observations for a product are
+\begin{equation}
+\widehat{D}=\{5,6,7,8,8\},
+\end{equation}
+then demand of 8 occurs on two of the five days, giving it an estimated probability of $2/5$, or 40\%. The probability of demand being 7 or fewer is $3/5$, or 60\%, while the probability of demand being 8 or fewer is $5/5$, or 100\%.
+
+For the fixed strategy, we combine observations across all weekdays to construct one empirical distribution for each bread type. For the day-of-week strategy, we construct separate empirical distributions for each bread type and weekday.
+
+\subsection{Determining Optimal Ordering Quantities}
+
+We implement our service-level-constrained newsvendor model in Python. The goal is to find the smallest whole-number quantity that would have satisfied estimated customer demand on at least 80\% of historical days.
+
+Our algorithm follows these steps:
+\begin{enumerate}
+\item Read the historical waste data and daily order quantities for the three bread products.
+\item Calculate estimated daily sales by subtracting recorded waste from the quantity ordered.
+\item Group the demand observations by bread type for the fixed strategy, and by bread type and weekday for the day-of-week strategy.
+\item Find the smallest whole-number ordering quantity that would have met estimated demand on at least 80\% of the observations in each group.
+\item Calculate expected waste and the proportion of observations in which demand would have been fully satisfied for each proposed order quantity.
+\item Compare the optimized strategies against the manager's current quantities.
+\end{enumerate}
+
+Mathematically, we use the empirical cumulative distribution function, which gives the proportion of observed days on which estimated demand was at most a proposed quantity $q$:
+\begin{equation}
+\widehat F(q)=\frac{\#\{\text{historical observations with }\widehat D\le q\}}{\#\{\text{historical observations}\}}.
+\label{eq:ecdf}
+\end{equation}
+The optimal order quantity is the smallest nonnegative whole number satisfying
+\begin{equation}
+\boxed{Q^*=\min\left\{q\in\mathbb{Z}_{\ge 0}:\widehat F(q)\ge 0.80\right\}.}
+\label{eq:quantile}
+\end{equation}
+This is equivalent to finding the empirical 80th percentile of estimated demand.
+
+\subsection{Example: Rustic Baguettes on Wednesdays}
+
+To illustrate our method, we examine Rustic Baguette waste on the four Wednesdays in our initial dataset. Assuming the store ordered 3 Rustic Baguettes each Wednesday, we obtain:
+
+\begin{table}[htbp]
+\centering
+\caption{Estimated Rustic Baguette demand on Wednesdays.}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Date & Ordered & Wasted & Estimated demand \\
+\midrule
+September 16 & 3 & 2 & 1 \\
+September 23 & 3 & 1 & 2 \\
+September 30 & 3 & 2 & 1 \\
+October 7 & 3 & 2 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Our estimated demand observations are
+\begin{equation}
+\widehat D=\{1,2,1,1\}.
+\end{equation}
+We want to find the smallest order $Q$ satisfying $\Pr(D\le Q)\ge 0.80$.
+
+First, consider ordering 1 Rustic Baguette. Demand is 1 or less on three of the four Wednesdays:
+\begin{equation}
+\widehat{\Pr}(D\le 1)=\frac{3}{4}=0.75.
+\end{equation}
+Since 75\% is below our 80\% requirement, ordering 1 baguette is not sufficient.
+
+Now consider ordering 2 baguettes. Demand is 2 or less on all four Wednesdays:
+\begin{equation}
+\widehat{\Pr}(D\le 2)=\frac{4}{4}=1.00.
+\end{equation}
+Therefore, the smallest quantity satisfying our constraint is
+\begin{equation}
+\boxed{Q^*_{\mathrm{Rustic,Wed}}=2.}
+\end{equation}
+Compared with the current order of 3 baguettes, this would reduce waste by 1 baguette each Wednesday. Across the four Wednesdays, this corresponds to 4 fewer baguettes wasted. The wholesale value of this reduction is
+\begin{equation}
+4\times\$2.49=\$9.96.
+\end{equation}
+This provides a preliminary example of how adjusting orders by weekday could reduce waste.
+
+However, these results are based on only four observations. The model satisfies all four observed Wednesday demand estimates, but this does not guarantee that ordering 2 baguettes will satisfy 80\% of future Wednesday demand.
+
+\subsection{Monte Carlo Simulation}
+
+After finding the optimized quantities, we plan to use Monte Carlo simulation to evaluate the three strategies under uncertain customer demand. Monte Carlo simulation involves repeatedly generating random outcomes using an estimated probability distribution.
+
+In our case, we will generate hypothetical daily demand by randomly sampling from our historical estimated demand distributions. For each simulated day, we will apply the order quantity determined by each strategy and calculate
+\begin{align}
+\text{Waste} &= \max(Q-D,0),\\
+\text{Unmet demand} &= \max(D-Q,0).
+\end{align}
+We will also record whether the amount ordered was sufficient to meet all estimated demand.
+
+The simulation procedure will be:
+\begin{enumerate}
+\item Determine the order quantity for each strategy before simulating demand.
+\item Generate a random demand observation from the estimated demand distribution.
+\item Calculate waste, unmet demand, and whether demand was fully satisfied under each strategy.
+\item Repeat across many simulated days.
+\item Calculate average waste, average unmet demand, and service levels for each strategy.
+\end{enumerate}
+
+To make comparisons fair, we will use the same simulated demand observations for all three strategies. We will also perform statistical analysis of the simulation results, including averages, variability, and confidence intervals for differences in waste between strategies.
+
+Because the simulations use distributions estimated from a limited historical sample, generating more simulated days does not necessarily make our demand estimates more accurate. We will therefore interpret simulation results as estimates under our assumptions, rather than guaranteed predictions of future performance.
+
+The Python code and detailed computational results will be included in an appendix.
+
+\subsection{Comparing Ordering Strategies}
+
+We will compare the performance of the three strategies to determine whether either optimized approach improves upon the store's current ordering system.
+
+Our primary measure of success will be average daily bread waste. We will also examine estimated unmet demand and the percentage of days on which customer demand is fully satisfied. These measures will help us determine whether a reduction in waste comes at the expense of excessive stockouts.
+
+Additionally, using wholesale costs provided by Pasta \& Co., we can calculate the monetary value of the bread wasted under each strategy.
+
+Our final recommendation will consider both the estimated reduction in waste and the practicality of implementing a more complicated ordering schedule.
+
+\section{Results}
+
+\subsection{Preliminary Historical Waste Analysis}
+
+Our initial analysis of the September 13--October 13, 2026 waste records identified \cite{waste2026}:
+
+\begin{table}[htbp]
+\centering
+\caption{Preliminary bread waste over the 31-day study period.}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Bread type & Units wasted & Wholesale cost of waste \\
+\midrule
+Rustic Baguette & 32 & \$79.68 \\
+Demi Baguette & 35 & \$33.95 \\
+Como Loaf & 11 & \$37.95 \\
+\midrule
+\textbf{Total} & \textbf{78} & \textbf{\$151.58} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These totals are based on a preliminary transcription of the photographed waste records. We excluded one potentially duplicated set of entries dated September 30.
+
+Over this 31-day period, the store discarded approximately 2.52 units per day across the three bread types. The records also show that waste varies by weekday. Wednesdays had the highest average waste in our cleaned dataset at 4.75 units, while Saturdays averaged only 0.5 units.
+
+This variation suggests that weekday-specific ordering may provide an opportunity to reduce waste. However, differences in recorded waste do not necessarily imply the same differences in actual demand, particularly if some products regularly sell out.
+
+\subsection{Preliminary Optimization Results}
+
+Using estimated sales as our initial approximation of demand, we applied the 80\% service-level model to the three bread types. The preliminary results were:
+
+\begin{table}[htbp]
+\centering
+\caption{Preliminary historical comparison of ordering strategies.}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Ordering strategy & Total wasted units & Wholesale waste cost \\
+\midrule
+Current ordering & 78 & \$151.58 \\
+Fixed optimization & 78 & \$151.58 \\
+Day-of-week optimization & 74 & \$141.62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Under the baseline demand assumption, the optimized fixed quantities were identical to the manager's current daily orders. This suggests that the manager's experience-based ordering strategy may already be close to optimal within our initial model.
+
+However, the day-of-week strategy identified one possible improvement: reducing Rustic Baguette orders from 3 to 2 on Wednesdays. This would have reduced total waste in the historical period by
+\begin{equation}
+\frac{78-74}{78}\times 100\%\approx 5.13\%.
+\end{equation}
+The reduction represents 4 fewer bread products discarded and \$9.96 in wholesale waste cost during the study period.
+
+Although the improvement is relatively small, it demonstrates how accounting for weekday differences can potentially improve ordering decisions.
+
+\subsection{Interpretation and Limitations}
+
+These results should be interpreted cautiously.
+
+First, our initial model assumes that actual demand equals observed sales, even on days when bread sells out. This means that the estimated demand distribution may understate the number of customers who wanted bread.
+
+Because our estimated demand is based on sales that could not exceed the original order quantity, the manager's current orders necessarily satisfy all of these lower-bound demand observations. This does \emph{not} mean that the store actually met all customer demand.
+
+Second, the model was optimized and evaluated using the same historical observations. Our 5.13\% reduction therefore represents an improvement on the observed dataset, not a verified reduction in future waste.
+
+Third, our dataset contains only four or five observations for each weekday. With four observations, satisfying at least 80\% of them requires satisfying all four. This makes our estimated weekday-specific order quantities particularly sensitive to individual observations.
+
+Finally, a more detailed ordering schedule would require additional administrative effort from the manager. A small improvement in waste reduction may not justify this extra work.
+
+We will use further sensitivity analysis and Monte Carlo simulation to investigate whether our preliminary findings remain reasonable under different assumptions about demand.
+
+\section{Improvements}
+
+\subsection{Accounting for Unmet Demand}
+
+One major limitation of our model is that actual customer demand is not fully observed when bread sells out.
+
+Our initial model uses recorded sales as a lower-bound estimate of demand, which may lead us to underestimate customer demand and recommend ordering too little bread.
+
+A possible improvement would be to test several assumptions about demand on sold-out days. For example, we could compare our baseline results with scenarios where actual demand is one or two units higher than recorded sales whenever a product sells out. This sensitivity analysis would help us determine how much our recommended quantities depend on the missing demand information.
+
+A more advanced approach would be to model customer demand using a Poisson distribution and estimate its average through maximum likelihood estimation while accounting for censored observations. This approach could be considered in a later version of the project, although it would require additional assumptions about the demand distribution.
+
+\subsection{Collecting More Historical Data}
+
+Our initial dataset contains approximately one month of observations. We plan to obtain substantially more historical ordering and waste records from the manager, ideally up to one full year. This could provide dozens of observations per weekday rather than four or five and allow us to investigate seasonal changes as well as weekday differences. Additional observations may reveal ordering improvements missed by the initial sample, but they could also confirm that the current schedule is already effective; more data does not guarantee a larger waste reduction.
+
+Additional information about when products sell out would also help us understand whether demand regularly exceeds the quantity stocked.
+
+\subsection{Comparing Different Service Levels}
+
+We currently require the store to satisfy estimated customer demand on at least 80\% of days. However, 80\% is a modeling choice rather than a service target established by the manager.
+
+An extension would be to compare 80\%, 90\%, and 95\% service levels to examine how much additional waste is associated with making bread available more frequently. This would allow the manager to decide which balance between waste and stockouts best fits the store.
+
+\subsection{Accounting for Seasonal and External Factors}
+
+Customer demand may change due to seasons, holidays, weather, or events near University Village. The manager has already explained that the store increases bread orders in winter and decreases them in summer.
+
+A more detailed model could estimate separate demand distributions for different seasons or incorporate other variables that help predict daily demand.
+
+\subsection{Ease of Implementation}
+
+The manager explained that changing bread orders through the supplier's website can be inconvenient. Therefore, even if weekday-specific optimization reduces waste, the improvement may not justify the additional administrative work.
+
+A possible extension would be to compare a weekday-specific schedule with a simpler weekday/weekend schedule. This would help us determine whether most of the potential waste reduction could be achieved without requiring different orders for every day of the week.
+
+\section{Conclusions}
+
+Our project investigates whether mathematical optimization can reduce bread waste at Pasta \& Co. University Village.
+
+We developed a service-level-constrained newsvendor model to compare the manager's current ordering practices with optimized fixed daily quantities and optimized day-of-week quantities.
+
+Our preliminary historical analysis suggests that the manager's current ordering strategy is already relatively effective under our initial assumptions. However, the weekday-specific optimization identified a possible improvement: reducing Rustic Baguette orders on Wednesdays.
+
+Under our baseline demand assumptions, this change would have reduced recorded bread waste by approximately 5.1\% during the study period.
+
+The main limitation is that our waste records do not reveal actual customer demand on sold-out days. Consequently, our results cannot yet establish that the proposed quantities will satisfy 80\% of actual future demand.
+
+Our next steps are to request up to a year of historical ordering and waste records, evaluate different assumptions about unmet demand, and use Monte Carlo simulation to compare the strategies under uncertainty.
+
+Ultimately, our goal is to recommend a practical ordering schedule that reduces unnecessary food waste while maintaining acceptable product availability. We also hope to determine whether the benefit of adjusting quantities by weekday is significant enough to justify the additional effort required from the manager.
+
+\section*{Acknowledgments}
+
+We would like to thank our community partner, Analise Backus, the manager of Pasta \& Co. University Village, for providing historical records, explaining the store's ordering process, and helping us identify a practical problem that could be investigated through mathematical modeling.
+
+We would also like to thank Professor Sara Billey for her guidance throughout this project.
+
+\begin{thebibliography}{99}
+
+\bibitem{waste2026}
+Pasta \& Co. University Village. \emph{Waste History Report}, September 13--October 13, 2026. Internal business records.
+
+\bibitem{invoice2026}
+Grand Central Bakery. \emph{Invoice}, October 18, 2026. Provided by Pasta \& Co.
+
+\bibitem{choi2012}
+T.-M. Choi (ed.). \emph{Handbook of Newsvendor Problems: Models, Extensions and Applications}. Springer, 2012. \url{https://books.google.com/books?id=vwNcQYc6DccC}.
+
+\bibitem{huber2019}
+J. Huber, S. M\"uller, M. Fleischmann, and H. Stuckenschmidt. ``A data-driven newsvendor problem: From data to decision.'' \emph{European Journal of Operational Research}, 278(3):904--915, 2019. \url{https://ideas.repec.org/a/eee/ejores/v278y2019i3p904-915.html}.
+
+\bibitem{pirani2016}
+S. I. Pirani and H. A. Arafat. ``Reduction of food waste generation in the hospitality industry.'' \emph{Journal of Cleaner Production}, 132:129--145, 2016. \url{https://www.sciencedirect.com/science/article/pii/S095965261501077X}.
+
+\bibitem{course2026}
+University of Washington. \emph{Course notes on mathematical modeling and optimization}. \url{https://canvas.uw.edu/courses/1920257/files/153693340?wrap=1}.
+
+\bibitem{openai2026}
+OpenAI. \emph{ChatGPT}, 2026. Used to assist with mathematical formulation, preliminary data analysis, Python implementation, and drafting.
+
+\bibitem{anthropic2026}
+Anthropic. \emph{Claude}, 2026. Consulted regarding possible methods for estimating censored demand.
+
+\end{thebibliography}
+
+% Include AI interaction transcripts, complete data, and code as appendices
+% or supplementary files before final submission, as required by the course.
+
+\end{document}
