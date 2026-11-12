@@ -1,3 +1,11 @@
 __pycache__/
 *.py[cod]
 
+# LaTeX build files (final PDFs remain tracked)
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
