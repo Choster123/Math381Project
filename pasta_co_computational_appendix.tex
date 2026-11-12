@@ -1,0 +1,324 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\lstdefinestyle{code}{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  numbers=left,
+  numberstyle=\scriptsize\color{gray},
+  showstringspaces=false,
+  tabsize=4
+}
+
+\lstdefinestyle{output}{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  showstringspaces=false
+}
+
+\title{Computational Appendix\\
+Less Left on the Shelf: Reducing Waste at Pasta \& Co.}
+\author{Elisa Regueros \and Chandler Olson}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+
+This appendix records the data-processing rules, implementation, and exact
+computer output supporting the preliminary results in the main report.  The
+analysis uses an empirical 80\% service-level rule and Monte Carlo resampling.
+It does not use a Poisson model or maximum-likelihood estimation.
+
+\section{Data Construction and Checks}
+
+The study period is September 13 through October 13, 2026, giving 31 calendar
+days and 93 bread-day observations.  The manager's daily quantities are 3
+Rustic Baguettes, 8 Demi Baguettes, and 1 Como Loaf.  For each bread $b$ and day
+$t$, estimated sales are constructed as
+\[
+  \widehat D_{b,t}=Q^{\mathrm{current}}_b-W_{b,t},
+\]
+where $W_{b,t}$ is recorded waste.  A date absent from the transcribed waste
+log is treated as having zero waste for all three products.  One suspected
+duplicate set of September 30 entries is excluded.
+
+The resulting dataset has no missing fields, duplicate bread-date keys, or
+violations of the identity
+\[
+  \text{current order}-\text{waste}=\text{estimated sales}.
+\]
+Table~\ref{tab:audit} summarizes the observations used by the program.
+
+\begin{table}[htbp]
+\centering
+\caption{Dataset audit by bread type.}
+\label{tab:audit}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Bread & Days & Ordered & Estimated sales & Waste & Zero-waste days \\
+\midrule
+Rustic & 31 & 93  & 61  & 32 & 16 \\
+Demi   & 31 & 248 & 213 & 35 & 19 \\
+Como   & 31 & 31  & 20  & 11 & 20 \\
+\midrule
+Total  & 93 & 372 & 294 & 78 & 55 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Zero waste is used as a sellout indicator in the sensitivity analysis.  This
+is an assumption: the available records do not show sellout time or attempted
+purchases after inventory reached zero.  In addition, treating an unlisted
+date as zero waste should be confirmed with the store's recordkeeping process.
+
+\section{Optimization Rule}
+
+For observations $D_1,\ldots,D_n$ in a group, the program sorts the values and
+returns observation
+\[
+  D_{(\lceil 0.80n\rceil)}.
+\]
+This is the smallest integer order quantity whose empirical service level is
+at least 80\%.  The fixed policy applies this rule to all 31 observations for
+each bread.  The weekday policy applies it separately to groups of four or
+five observations for each bread-weekday pair.
+
+For a proposed quantity $Q$ and assumed demand $D$, the program evaluates
+\[
+  \text{waste}=\max(Q-D,0),\qquad
+  \text{unmet demand}=\max(D-Q,0).
+\]
+Waste cost is waste multiplied by the corresponding wholesale unit cost.
+Service level is the percentage of the 93 bread-day observations for which
+$D\leq Q$.
+
+\section{Baseline Results}
+
+The baseline sets assumed demand equal to estimated sales, including on
+zero-waste days.  The fixed optimized quantities are therefore identical to
+the current quantities: Como 1, Demi 8, and Rustic 3.  The weekday result is
+shown in Table~\ref{tab:schedule}.
+
+\begin{table}[htbp]
+\centering
+\caption{Baseline weekday optimized quantities.}
+\label{tab:schedule}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Weekday & Como & Demi & Rustic \\
+\midrule
+Monday    & 1 & 8 & 3 \\
+Tuesday   & 1 & 8 & 3 \\
+Wednesday & 1 & 8 & 2 \\
+Thursday  & 1 & 8 & 3 \\
+Friday    & 1 & 8 & 3 \\
+Saturday  & 1 & 8 & 3 \\
+Sunday    & 1 & 8 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Baseline in-sample strategy comparison.}
+\label{tab:baseline}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Strategy & Wasted units & Waste cost & Service (\%) & Unmet units \\
+\midrule
+Current           & 78 & \$151.58 & 100.00 & 0 \\
+Fixed optimized   & 78 & \$151.58 & 100.00 & 0 \\
+Weekday optimized & 74 & \$141.62 & 100.00 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The weekday policy reduces in-sample waste by 4 units, or
+$4/78=5.13\%$, and reduces wholesale waste cost by \$9.96.  All four units are
+Rustic Baguettes on Wednesdays.  These are in-sample calculations, not
+out-of-sample performance estimates.
+
+The 100\% baseline service level should not be interpreted as 100\% of actual
+customer demand being met.  Estimated sales cannot exceed the historical
+order quantity, so current orders cover every baseline observation by
+construction.
+
+\section{Censored-Demand Sensitivity Analysis}
+
+For a sensitivity value $k\in\{0,1,2\}$, the program defines
+\[
+  D^{(k)}_{b,t}=\widehat D_{b,t}
+  +k\,\mathbf{1}\{W_{b,t}=0\}.
+\]
+The values $k=1$ and $k=2$ are hypothetical scenarios, not observed demand.
+Table~\ref{tab:sensitivity} gives the exact program output.
+
+\begin{table}[htbp]
+\centering
+\caption{Sensitivity results by assumed additional sellout demand.}
+\label{tab:sensitivity}
+\begin{tabular}{@{}clrrrr@{}}
+\toprule
+$k$ & Strategy & Waste & Waste cost & Service (\%) & Unmet units \\
+\midrule
+0 & Current           & 78  & \$151.58 & 100.00 & 0 \\
+0 & Fixed optimized   & 78  & \$151.58 & 100.00 & 0 \\
+0 & Weekday optimized & 74  & \$141.62 & 100.00 & 0 \\
+\midrule
+1 & Current           & 78  & \$151.58 & 40.86 & 55 \\
+1 & Fixed optimized   & 116 & \$238.52 & 100.00 & 0 \\
+1 & Weekday optimized & 108 & \$218.60 & 100.00 & 0 \\
+\midrule
+2 & Current           & 78  & \$151.58 & 40.86 & 110 \\
+2 & Fixed optimized   & 154 & \$325.46 & 100.00 & 0 \\
+2 & Weekday optimized & 142 & \$295.58 & 100.00 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The fixed quantities become $(\text{Como},\text{Demi},\text{Rustic})=(2,9,4)$
+when $k=1$ and $(3,10,5)$ when $k=2$.  The weekday quantities generally rise
+by the same increment.  Wednesday Rustic remains 2 because none of its four
+observations is classified as a sellout in the transcribed data.
+
+The current policy's waste remains 78 in these scenarios because additional
+demand is added only where recorded waste was already zero.  Its modeled
+service falls to 40.86\% because 55 of 93 bread-day observations are treated
+as having demand above the current quantity.  These sensitivity results show
+that conclusions depend strongly on the censored-demand assumption.
+
+\section{Monte Carlo Validation}
+
+The program performs 10,000 simulations using random seed 381.  For each of
+the 93 bread-day positions in the study period, it samples demand with
+replacement from the historical observations having the same bread type and
+weekday.  All three strategies are evaluated on the same sampled demand in
+each run, allowing paired comparisons.  Table~\ref{tab:monte-carlo} reports
+the mean results and the 2.5th and 97.5th percentiles of total waste.
+
+\begin{table}[htbp]
+\centering
+\caption{Monte Carlo results from 10,000 empirical-resampling runs.}
+\label{tab:monte-carlo}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Strategy & Mean waste & 95\% low & 95\% high & Mean cost & Service & Unmet \\
+\midrule
+Current           & 78.27 & 57 & 100 & \$151.96 & 100\% & 0 \\
+Fixed optimized   & 78.27 & 57 & 100 & \$151.96 & 100\% & 0 \\
+Weekday optimized & 74.27 & 53 &  96 & \$142.00 & 100\% & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In paired comparisons, fixed optimization reduces waste by 0 units in every
+run.  Weekday optimization reduces waste by exactly 4 units in every run, so
+its simulated probability of producing less waste than the current policy is
+1.00.  This result is constant because the policies differ only for the four
+Wednesday Rustic positions, and every demand value in that empirical pool is
+at most 2.
+
+This simulation verifies the calculations under the fitted empirical model;
+it is not independent evidence that the policy will save exactly four units
+in a future month.  Resampling the same four or five weekday observations
+cannot represent demand values or external conditions absent from the data.
+
+\section{Exact Console Output}
+
+The following output was produced by running
+\texttt{python pasta\_bread\_cleaned\_model.py} with Python 3.14, pandas 3.1.1,
+and NumPy 2.5.4.
+
+\begin{lstlisting}[style=output]
+FIXED OPTIMAL QUANTITIES:
+{'Como': 1, 'Demi': 8, 'Rustic': 3}
+
+WEEKDAY OPTIMAL QUANTITIES:
+           Como  Demi  Rustic
+Monday        1     8       3
+Tuesday       1     8       3
+Wednesday     1     8       2
+Thursday      1     8       3
+Friday        1     8       3
+Saturday      1     8       3
+Sunday        1     8       3
+
+STRATEGY COMPARISON:
+                   wasted_units  waste_cost  service_level_pct  unmet_units
+Current                    78.0      151.58              100.0          0.0
+Fixed optimized            78.0      151.58              100.0          0.0
+Weekday optimized          74.0      141.62              100.0          0.0
+
+ADDITIONAL DEMAND ON SELLOUTS: 0
+                   wasted_units  waste_cost  service_level_pct  unmet_units
+Current                    78.0      151.58              100.0          0.0
+Fixed optimized            78.0      151.58              100.0          0.0
+Weekday optimized          74.0      141.62              100.0          0.0
+
+ADDITIONAL DEMAND ON SELLOUTS: 1
+                   wasted_units  waste_cost  service_level_pct  unmet_units
+Current                    78.0      151.58              40.86         55.0
+Fixed optimized           116.0      238.52             100.00          0.0
+Weekday optimized         108.0      218.60             100.00          0.0
+
+ADDITIONAL DEMAND ON SELLOUTS: 2
+                   wasted_units  waste_cost  service_level_pct  unmet_units
+Current                    78.0      151.58              40.86        110.0
+Fixed optimized           154.0      325.46             100.00          0.0
+Weekday optimized         142.0      295.58             100.00          0.0
+
+MONTE CARLO RESULTS (10,000 RUNS):
+                   mean_waste  waste_95_low  waste_95_high  mean_waste_cost  mean_service_pct  mean_unmet
+strategy
+Current                 78.27          57.0          100.0           151.96             100.0         0.0
+Fixed optimized         78.27          57.0          100.0           151.96             100.0         0.0
+Weekday optimized       74.27          53.0           96.0           142.00             100.0         0.0
+
+PAIRED WASTE COMPARISONS:
+                   mean_waste_reduction  reduction_95_low  reduction_95_high  probability_less_waste
+strategy
+Fixed optimized                     0.0               0.0                0.0                     0.0
+Weekday optimized                   4.0               4.0                4.0                     1.0
+\end{lstlisting}
+
+\section{Reproducibility and Limitations}
+
+The baseline optimization and evaluation use the same observations.  The
+reported 5.13\% reduction is therefore a historical fit and is not a validated
+forecast.  Each weekday group contains only four or five observations.  With
+four observations, the empirical 80th percentile is the maximum observation;
+with five, it is the fourth ordered observation.  Weekday recommendations can
+therefore change substantially when a single observation changes.
+
+Additional waste records would improve sample size but would not by themselves
+identify demand above the current stock level.  Stockout times, attempted
+purchases after sellout, or observations collected under higher order
+quantities would provide information about censored demand.
+
+The Monte Carlo analysis uses the empirical weekday distributions, 10,000
+runs, and random seed 381.  It quantifies simulation variability under those
+distributions but does not remove the underlying censoring or small-sample
+limitations.  The sensitivity analysis separately changes all zero-waste
+observations by the same deterministic amount.
+
+\section{Complete Python Source}
+
+The complete analysis program is included directly from the repository below.
+Keeping the listing linked to the source file prevents the appendix from
+silently diverging from the executed code.
+
+\lstinputlisting[style=code,language=Python]{pasta_bread_cleaned_model.py}
+
+\end{document}
